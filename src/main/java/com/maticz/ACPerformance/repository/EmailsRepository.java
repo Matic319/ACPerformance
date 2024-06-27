@@ -21,17 +21,31 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
 
     Optional<Emails> findByIdSubscriberAndIdCampaignAndPage(Integer idSubscriber, Integer idCampaign, Integer page);
 
-    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpened(Integer idSubscriber, Integer idCampaign, LocalDate opened);
+    @Query(value = "select * from AC_fact_emails e " +
+            "where e.idSubscriber = :idSubscriber and e.idCampaign = :idCampaign " +
+            "and (CAST(e.opened AS date) = :openedDate OR " +
+            "(e.opened is null AND cast(e.email_sent as date) between " +
+            "cast(dateadd(month, -1, getdate()) as date) AND cast(getdate() as date))) ",
+            nativeQuery = true)
+    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpened(
+            @Param("idSubscriber") Integer idSubscriber,
+            @Param("idCampaign") Integer idCampaign,
+            @Param("openedDate") LocalDate openedDate
+    );
 
     @Transactional
     @Modifying
     @Query(
             value = "update ac_fact_emails " +
-                    "set times_opened = :timesOpened , opened = :opened " +
-                    "where idSubscriber = :idSubscriber and idCampaign = :idCampaign", nativeQuery = true
+                    "set times_opened = :timesOpened , opened = :opened , page = :page " +
+                    "where idSubscriber = :idSubscriber and idCampaign = :idCampaign " +
+                    " and (CAST(opened AS date) = :opened OR " +
+                    "            (opened is null AND cast(email_sent as date) between " +
+                    "           cast(dateadd(month, -1, getdate()) as date) AND cast(getdate() as date))) ", nativeQuery = true
     )
     void updateValuesByIdSubscriberAndIdCampaign(@Param("timesOpened") Integer timesOpened, @Param("opened") LocalDateTime opened,
-                                                 @Param("idSubscriber") Integer idSubscriber, @Param("idCampaign") Integer idCampaign);
+                                                 @Param("idSubscriber") Integer idSubscriber, @Param("idCampaign") Integer idCampaign,
+                                                @Param("page") Integer page);
 
     @Query(
             value = "select case when max(page) = 1 then 1 " +

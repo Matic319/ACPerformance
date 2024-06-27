@@ -245,7 +245,7 @@ public class ACServiceImpl implements ACService {
                             emails.setPage(i);
 
                             if (emailsRepository.findByIdSubscriberAndIdCampaign(idSubscriber, id).isPresent()) {
-                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id);
+                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id, i);
                             } else {
                                 emailsRepository.save(emails);
                                 if (hashMapOfContactAndCampaignAdded.containsKey(id)) {
@@ -696,7 +696,7 @@ public class ACServiceImpl implements ACService {
                             logger.info("idSubscriber getDataForClientsThatOpenedCampaignsAndAddTimestampToMap : " + idSubscriber + "timestamp: " + timestamp);
 
                             if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpened(idSubscriber, id, LocalDate.from(emails.getOpened())).isPresent()) {
-                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id);
+                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id,page);
                             } else {
                                 emailsRepository.save(emails);
                                 if (mapIdCampaignTimestamp.containsKey(id)) {
