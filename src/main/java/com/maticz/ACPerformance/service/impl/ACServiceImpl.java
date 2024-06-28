@@ -630,7 +630,7 @@ public class ACServiceImpl implements ACService {
                                     }
                                     emails.setImportTimestamp(LocalDateTime.now());
                                     logger.info(emails.toString());
-                                    if (emailsRepository.findByIdSubscriberAndIdCampaign(idSubscriber, idCampaign).isEmpty()) {
+                                    if (emailsRepository.findByIdSubscriberAndIdCampaignAndPage(idSubscriber, idCampaign,j).isEmpty()) {
                                         emailsRepository.save(emails);
                                     }
                                     logger.info(emails.toString());
