@@ -2,6 +2,7 @@ package com.maticz.ACPerformance.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.maticz.ACPerformance.model.Campaign;
+import com.maticz.ACPerformance.service.ACServiceNew;
 import com.maticz.ACPerformance.service.impl.ACServiceImpl;
 import com.maticz.ACPerformance.service.impl.EmailWarningImpl;
 import jakarta.mail.MessagingException;
@@ -20,6 +21,8 @@ public class ACController {
     @Autowired
     ACServiceImpl acService;
 
+     @Autowired
+     ACServiceNew acServiceNew;
 
     @Autowired
     EmailWarningImpl emailWarning;
@@ -89,4 +92,16 @@ public class ACController {
         return ResponseEntity.ok("ok");
     }
 
+    @GetMapping("test")
+    ResponseEntity<String> abv() throws JsonProcessingException {
+        acService.izbrisPol();
+        return ResponseEntity.ok("ok");
+    }
+
+
+    @GetMapping("test2")
+    ResponseEntity<String> abv2() throws JsonProcessingException {
+        acServiceNew.getDataFromACAndSaveToDB();
+        return ResponseEntity.ok("ok");
+    }
 }

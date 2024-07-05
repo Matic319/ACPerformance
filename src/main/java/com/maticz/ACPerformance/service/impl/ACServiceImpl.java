@@ -26,10 +26,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
+import java.time.format.DateTimeParseException;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -286,7 +284,6 @@ public class ACServiceImpl implements ACService {
         for (int i = 1; i < 100; i++) {
             JsonNode node = getCampaingDataForLastWeek(String.valueOf(i));
 
-
             for (JsonNode data : node) {
                 if (Integer.parseInt(node.path("result_code").asText()) == 0) {
                     break;
@@ -390,7 +387,7 @@ public class ACServiceImpl implements ACService {
                                 }
                             }
 
-                        } catch (NumberFormatException | NullPointerException f) {
+                        } catch (NumberFormatException | NullPointerException ignored) {
                         }
                     }
                 }
@@ -413,7 +410,7 @@ public class ACServiceImpl implements ACService {
         while (!success && retryCount < MAX_RETRIES) {
             try {
                 RestTemplate restTemplate = new RestTemplate();
-                String baseUrl = "https://woop.api-us1.com/api/3/activities?contact=" + idSubscriber + "&orders[tstamp]=desc&limit=100&api_output=json";
+                String baseUrl = "https://woop.api-us1.com/api/3/activities?contact=" + idSubscriber + "&orders[tstamp]=desc&limit=1000&api_output=json";
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Api-Token", apiToken);
                 HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -452,7 +449,7 @@ public class ACServiceImpl implements ACService {
         while (!success && retryCount < MAX_RETRIES) {
             try {
                 RestTemplate restTemplate = new RestTemplate();
-                String baseUrl = "https://woop.api-us1.com/api/3/activities?contact=" + idSubscriber + "&after=" + date + "&orders[tstamp]=asc&api_output=json";
+                String baseUrl = "https://woop.api-us1.com/api/3/activities?contact=" + idSubscriber + "&after=" + date + "&orders[tstamp]=asc&api_output=json&limit=1000";
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Api-Token", apiToken);
                 HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -595,7 +592,7 @@ public class ACServiceImpl implements ACService {
                             } catch (NumberFormatException | NullPointerException e) {
                                 skip = true;
                             }
-                            if (skip = false) {
+                            if (skip == false) {
                                 Integer idCampaign = Integer.valueOf(row[0].toString());
 
                                 Emails emails = new Emails();
@@ -630,10 +627,10 @@ public class ACServiceImpl implements ACService {
                                     }
                                     emails.setImportTimestamp(LocalDateTime.now());
                                     logger.info(emails.toString());
-                                    if (emailsRepository.findByIdSubscriberAndIdCampaignAndPage(idSubscriber, idCampaign,j).isEmpty()) {
-                                        emailsRepository.save(emails);
-                                    }
-                                    logger.info(emails.toString());
+
+                                }
+                                if (emailsRepository.findByIdSubscriberAndIdCampaignAndPage(idSubscriber, idCampaign, j).isEmpty()) {
+                                    emailsRepository.save(emails);
                                 }
                             } else {
                                 break;
@@ -658,7 +655,6 @@ public class ACServiceImpl implements ACService {
     public HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap() throws JsonProcessingException {
 
         List<Integer> list = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
-
         HashMap<Integer, LocalDateTime> mapIdCampaignTimestamp = new HashMap<>();
 
         for (int id : list) {
@@ -671,16 +667,17 @@ public class ACServiceImpl implements ACService {
             }
             for (int i = page; i < 1000; i++) {
                 JsonNode node = getClientsByCampaign(String.valueOf(id), String.valueOf(i));
+                logger.info(" JsonNode: {}", node);
 
                 if (Objects.equals(node.path("result_code").asText(), "0")) {
                     break;
                 } else {
-
                     for (JsonNode data : node) {
                         try {
-                            Integer idSubscriber = Integer.valueOf(data.path("subscriberid").asText());
+
+                            Integer idSubscriber = data.path("subscriberid").asInt();
                             String email = data.path("email").asText();
-                            Integer times = Integer.valueOf(data.path("times").asText());
+                            Integer times = data.path("times").asInt();
                             LocalDateTime timestamp = LocalDateTime.parse(data.path("tstamp").asText(), formatter);
 
                             Emails emails = new Emails();
@@ -693,10 +690,9 @@ public class ACServiceImpl implements ACService {
                             emails.setEmailSent(timestamp);
                             emails.setImportTimestamp(LocalDateTime.now());
                             emails.setPage(i);
-                            logger.info("idSubscriber getDataForClientsThatOpenedCampaignsAndAddTimestampToMap : " + idSubscriber + "timestamp: " + timestamp);
 
-                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpened(idSubscriber, id, LocalDate.from(emails.getOpened())).isPresent()) {
-                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id,page);
+                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpenedAndPage(idSubscriber, id, LocalDate.from(emails.getOpened()),i).isPresent()) {
+                                emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id, page);
                             } else {
                                 emailsRepository.save(emails);
                                 if (mapIdCampaignTimestamp.containsKey(id)) {
@@ -705,12 +701,87 @@ public class ACServiceImpl implements ACService {
                                     mapIdCampaignTimestamp.put(id, timestamp);
                                 }
                             }
-                        } catch (NumberFormatException | NullPointerException ignored) {
+                        } catch (NumberFormatException | NullPointerException e) {
+                            logger.info("ERROR: " + e.getMessage()  +  "\n" + Arrays.toString(e.getStackTrace()) );
                         }
                     }
                 }
             }
         }
+        return mapIdCampaignTimestamp;
+    }
+
+    @Override
+    public HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2() throws JsonProcessingException {
+        List<Integer> list = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
+        HashMap<Integer, LocalDateTime> mapIdCampaignTimestamp = new HashMap<>();
+        ObjectMapper mapper = new ObjectMapper();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        for (int id : list) {
+            int page = emailsRepository.getPageNumberForCampaignByIdTimesOpenedGreaterThen0(id);
+            Integer messageID = null;
+            try {
+                messageID = campaignRepository.getIdMessageForCampaign(id);
+            } catch (NumberFormatException e) {
+                logger.warn("Failed to get message ID for campaign {}: {}", id, e.getMessage());
+            }
+
+            for (int i = page; i < 1000; i++) {
+                JsonNode node = getClientsByCampaign(String.valueOf(id), String.valueOf(i));
+                logger.info("Processing JsonNode for campaign {} page {}: {}", id, i, node);
+
+                String resultCode = node.path("result_code").asText();
+                if ("0".equals(resultCode)) {
+                    logger.info("No data to process for campaign {} page {} (result_code: 0)", id, i);
+                    break;
+                }
+                for (JsonNode data : node) {
+                    if (!data.isObject()) {
+                        continue;
+                    }
+
+                    try {
+                        Integer idSubscriber = data.path("subscriberid").asInt();
+                        String email = data.path("email").asText();
+                        Integer times = data.path("times").asInt();
+                        String tstampStr = data.path("tstamp").asText();
+
+                        if (tstampStr == null || tstampStr.isEmpty()) {
+                            logger.warn("Empty timestamp for subscriber {} in campaign {}", idSubscriber, id);
+                            continue;
+                        }
+
+                        LocalDateTime timestamp = LocalDateTime.parse(tstampStr, formatter);
+
+                        Emails emails = new Emails();
+                        emails.setEmail(email);
+                        emails.setIdSubscriber(idSubscriber);
+                        emails.setIdCampaign(id);
+                        emails.setOpened(timestamp);
+                        emails.setTimesOpened(times);
+                        emails.setIdMessage(messageID);
+                        emails.setEmailSent(timestamp);
+                        emails.setImportTimestamp(LocalDateTime.now());
+                        emails.setPage(i);
+
+                        if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpenedAndPage(idSubscriber, id, LocalDate.from(emails.getOpened()), i).isPresent()) {
+                            emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id, page);
+                        } else {
+                            emailsRepository.save(emails);
+                            if (!mapIdCampaignTimestamp.containsKey(id)) {
+                                mapIdCampaignTimestamp.put(id, timestamp);
+                            }
+                        }
+                    } catch (DateTimeParseException e) {
+                        logger.error("Error parsing timestamp for subscriber in campaign {} page {}: {}", id, i, e.getMessage());
+                    } catch (Exception e) {
+                        logger.error("Error processing subscriber data for campaign {} page {}: {}", id, i, e.getMessage());
+                    }
+                }
+            }
+        }
+
         return mapIdCampaignTimestamp;
     }
 
@@ -762,4 +833,53 @@ public class ACServiceImpl implements ACService {
 
 
     }
+
+    @Override
+    public void izbrisPol() throws JsonProcessingException {
+        List<Integer> list = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
+
+        for (int id : list) {
+            int page = emailsRepository.getPageNumberForCampaignByIdTimesOpenedGreaterThen0(id);
+            Integer messageID = null;
+            try {
+                messageID = campaignRepository.getIdMessageForCampaign(id);
+            } catch (NumberFormatException ignored) {
+            }
+            for (int i = page; i < 1000; i++) {
+                JsonNode node = getClientsByCampaign(String.valueOf(id), String.valueOf(i));
+                if (Objects.equals(node.path("result_code").asText(), "0")) {
+                    break;
+                } else {
+                    Iterator<String> fieldNames = node.fieldNames();
+                    while (fieldNames.hasNext()) {
+                        String fieldName = fieldNames.next();
+                        if (fieldName.matches("\\d+")) {
+                            JsonNode dataNode = node.get(fieldName);
+                            Integer nodeFieldNumber = Integer.valueOf(fieldName);
+                            logger.info("dataNodeParent: " + nodeFieldNumber);
+                            logger.info("dataNode: " + dataNode.toString());
+
+                            String idSubscriber = dataNode.path("subscriberid").asText();
+                            String email = dataNode.path("email").asText();
+                            String timestamp = dataNode.path("tstamp").asText();
+                            String timesOpened = dataNode.path("times").asText();
+
+                            logger.info("Subscriber ID: " + idSubscriber + ", Email: " + email +
+                                    ", Timestamp: " + timestamp + ", Times: " + timesOpened);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+
+
+
+
+
+
+
+
+

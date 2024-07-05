@@ -22,15 +22,16 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
     Optional<Emails> findByIdSubscriberAndIdCampaignAndPage(Integer idSubscriber, Integer idCampaign, Integer page);
 
     @Query(value = "select * from AC_fact_emails e " +
-            "where e.idSubscriber = :idSubscriber and e.idCampaign = :idCampaign " +
+            "where e.idSubscriber = :idSubscriber and e.idCampaign = :idCampaign and e.page = :page " +
             "and (CAST(e.opened AS date) = :openedDate OR " +
             "(e.opened is null AND cast(e.email_sent as date) between " +
             "cast(dateadd(month, -1, getdate()) as date) AND cast(getdate() as date))) ",
             nativeQuery = true)
-    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpened(
+    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpenedAndPage(
             @Param("idSubscriber") Integer idSubscriber,
             @Param("idCampaign") Integer idCampaign,
-            @Param("openedDate") LocalDate openedDate
+            @Param("openedDate") LocalDate openedDate,
+            @Param("page") Integer page
     );
 
     @Transactional
@@ -141,5 +142,12 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
                     "where st < 20\n" +
                     "group by idCampaign " , nativeQuery = true)
     List<Object[]> getMinPageWhereCountLessThen20ForBdayPhotos();
+
+    @Query
+            (value = " select case when dateFrom is null then (select create_date from AC_ref_campaigns where idcampaign = :idCampaign) else dateFrom end from (\n" +
+                    "\tselect cast(dateadd(day,-14,max(email_sent)) as date) dateFrom from AC_fact_emails a\n" +
+                    "\twhere times_opened = 0  \n" +
+                    "    and a.idCampaign = :idCampaign ) a " , nativeQuery = true)
+    String dateToSearchByForUnopenedClients(@Param("idCampaign") Integer idCampaign);
 
 }

@@ -43,7 +43,12 @@ public interface ACService{
 
     HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap() throws JsonProcessingException;
 
+    HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2() throws JsonProcessingException;
+
     void saveContactsWhereDataIsMissingForPhotos() throws JsonProcessingException;
+
+
+    void izbrisPol() throws JsonProcessingException;
 
 
 
