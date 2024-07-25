@@ -48,7 +48,6 @@ public interface ACService{
     void saveContactsWhereDataIsMissingForPhotos() throws JsonProcessingException;
 
 
-    void izbrisPol() throws JsonProcessingException;
 
 
 

@@ -21,17 +21,38 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
 
     Optional<Emails> findByIdSubscriberAndIdCampaignAndPage(Integer idSubscriber, Integer idCampaign, Integer page);
 
+    @Query(value = "  SELECT TOP 1 *\n" +
+            "FROM AC_fact_emails\n" +
+            "WHERE idsubscriber = :idSubscriber " +
+            "AND idCampaign = :idCampaign " +
+            "AND (\n" +
+            "    CAST(importTimestamp AS DATE) BETWEEN CAST(DATEADD(DAY, -10, GETDATE()) AS DATE) AND CAST(GETDATE() AS DATE)\n" +
+            "    OR (\n" +
+            "        page = :page " +
+            "        AND times_opened = 0\n" +
+            "    )\n" +
+            ")\n" +
+            "ORDER BY \n" +
+            "    CASE \n" +
+            "        WHEN CAST(importTimestamp AS DATE) BETWEEN CAST(DATEADD(DAY, -10, GETDATE()) AS DATE) AND CAST(GETDATE() AS DATE) THEN 0\n" +
+            "        ELSE 1\n" +
+            "    END,\n" +
+            "    importTimestamp DESC ", nativeQuery = true) // unopened page numb se lahko spreminja če odprejo mail !!!
+    Optional<Emails> findByIdSubscriberAndIdCampaignAndPageAndImportTimestamp(
+            @Param("idSubscriber") Integer idSubscriber,
+            @Param("idCampaign") Integer idCampaign,
+            @Param("page") Integer page);
+
     @Query(value = "select * from AC_fact_emails e " +
-            "where e.idSubscriber = :idSubscriber and e.idCampaign = :idCampaign and e.page = :page " +
+            "where e.idSubscriber = :idSubscriber and e.idCampaign = :idCampaign " +
             "and (CAST(e.opened AS date) = :openedDate OR " +
             "(e.opened is null AND cast(e.email_sent as date) between " +
             "cast(dateadd(month, -1, getdate()) as date) AND cast(getdate() as date))) ",
             nativeQuery = true)
-    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpenedAndPage(
+    Optional<Emails> findByIdSubscriberAndIdCampaignAndOpened(
             @Param("idSubscriber") Integer idSubscriber,
             @Param("idCampaign") Integer idCampaign,
-            @Param("openedDate") LocalDate openedDate,
-            @Param("page") Integer page
+            @Param("openedDate") LocalDate openedDate
     );
 
     @Transactional
@@ -122,14 +143,12 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
     List<Object[]> getIdSubscriberWithountEmailSentWithConcatenatedIdCampaign();
 
     @Query
-            (value = " select * from (select count(*) cnt , email , string_agg(a.idcampaign, '|') within group (order by email) campaingList, cast(email_sent as date) date, string_agg(b.automation, '|') within group (order by email) automationList \n" +
-                    "                    from AC_fact_emails a, AC_ref_campaigns b \n" +
-                    "                    where a.idcampaign not in (437,438,439,440,442,443,445,447,449,548,549,550,551,552,554,555,557,960 \n" +
-                    "                    ,961,963,965,967,969,1071,1073,1078,1080,1082,1084, 182, 1011, 1013, 516, 491, 522, 560 , 561, 562, 572\n" +
-                    "                    ,195,197,198,351,435,491,827,828,841,842, 573) and a.idcampaign = b.idcampaign \n" +
-                    "                    and b.automation is not null\n" +
-                    "                    group by email, cast(email_sent as date) ) a \n" +
-                    "                    where date = cast(GETDATE() as date) and cnt  > 1", nativeQuery = true)
+            (value = " select * from (select count(*) cnt , email , string_agg(a.idcampaign, '|') within group (order by email) campaingList, cast(email_sent as date) date, string_agg(b.automation, '|') within group (order by email) automationList  \n" +
+                    "                                        from AC_fact_emails a, AC_ref_campaigns b  \n" +
+                    "                                        where isnull(b.ignoreMultipleEmails,0) <> 1  and a.idcampaign = b.idcampaign  \n" +
+                    "                                        and b.automation is not null \n" +
+                    "                                        group by email, cast(email_sent as date) ) a  \n" +
+                    "                                        where date = cast(GETDATE() as date) and cnt  > 1 ", nativeQuery = true)
     List<Object[]> getAllClientsThatReceivedMultipleEmailsInTheSameDay();
 
 

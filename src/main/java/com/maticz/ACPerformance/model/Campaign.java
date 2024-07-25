@@ -81,4 +81,6 @@ public class Campaign {
     @Column(name = "import_to_fact_emails")
     private Integer importToFactEmails;
 
+    @Column(name = "ignoreMultipleEmails")
+    private Integer ignoreMultipleEmails;
 }

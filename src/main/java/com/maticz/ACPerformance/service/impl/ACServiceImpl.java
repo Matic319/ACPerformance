@@ -54,6 +54,8 @@ public class ACServiceImpl implements ACService {
     DateTimeFormatter formatterDB = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S");
 
 
+
+
     @Override
     public String getACData() throws JsonProcessingException {
         RestTemplate restTemplate = new RestTemplate();
@@ -111,7 +113,11 @@ public class ACServiceImpl implements ACService {
                     }
                     if (sendAmount > 0) {
                         Campaign cmpg = getCampaign(data, sendAmount);
-                        campaignRepository.save(cmpg);
+                        if(campaignRepository.findByIdCampaign(cmpg.getIdCampaign()).isEmpty()){
+                            campaignRepository.save(cmpg);
+                        } else {
+                            cmpg.setIgnoreMultipleEmails(campaignRepository.ignoreListValue(cmpg.getIdCampaign()));
+                        }
                     } else {
 
                     }
@@ -295,8 +301,12 @@ public class ACServiceImpl implements ACService {
                         break;
                     }
                     Campaign cmpg = getCampaign(data, sendAmount);
-
-                    campaignRepository.save(cmpg);
+                    if(campaignRepository.findByIdCampaign(cmpg.getIdCampaign()).isEmpty()){
+                        campaignRepository.save(cmpg);
+                    } else {
+                        cmpg.setIgnoreMultipleEmails(campaignRepository.ignoreListValue(cmpg.getIdCampaign()));
+                        cmpg.setImportToFactEmails(campaignRepository.importToFactValue(cmpg.getIdCampaign()));
+                    }
                     savedData.add(cmpg);
 
                 }
@@ -691,7 +701,7 @@ public class ACServiceImpl implements ACService {
                             emails.setImportTimestamp(LocalDateTime.now());
                             emails.setPage(i);
 
-                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpenedAndPage(idSubscriber, id, LocalDate.from(emails.getOpened()),i).isPresent()) {
+                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpened(idSubscriber, id, LocalDate.from(emails.getOpened())).isPresent()) {
                                 emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id, page);
                             } else {
                                 emailsRepository.save(emails);
@@ -715,7 +725,6 @@ public class ACServiceImpl implements ACService {
     public HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2() throws JsonProcessingException {
         List<Integer> list = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
         HashMap<Integer, LocalDateTime> mapIdCampaignTimestamp = new HashMap<>();
-        ObjectMapper mapper = new ObjectMapper();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         for (int id : list) {
@@ -765,7 +774,7 @@ public class ACServiceImpl implements ACService {
                         emails.setImportTimestamp(LocalDateTime.now());
                         emails.setPage(i);
 
-                        if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpenedAndPage(idSubscriber, id, LocalDate.from(emails.getOpened()), i).isPresent()) {
+                        if (emailsRepository.findByIdSubscriberAndIdCampaignAndOpened(idSubscriber, id, LocalDate.from(emails.getOpened())).isPresent()) {
                             emailsRepository.updateValuesByIdSubscriberAndIdCampaign(times, timestamp, idSubscriber, id, page);
                         } else {
                             emailsRepository.save(emails);
@@ -830,48 +839,9 @@ public class ACServiceImpl implements ACService {
             }
 
         });
-
-
     }
 
-    @Override
-    public void izbrisPol() throws JsonProcessingException {
-        List<Integer> list = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
 
-        for (int id : list) {
-            int page = emailsRepository.getPageNumberForCampaignByIdTimesOpenedGreaterThen0(id);
-            Integer messageID = null;
-            try {
-                messageID = campaignRepository.getIdMessageForCampaign(id);
-            } catch (NumberFormatException ignored) {
-            }
-            for (int i = page; i < 1000; i++) {
-                JsonNode node = getClientsByCampaign(String.valueOf(id), String.valueOf(i));
-                if (Objects.equals(node.path("result_code").asText(), "0")) {
-                    break;
-                } else {
-                    Iterator<String> fieldNames = node.fieldNames();
-                    while (fieldNames.hasNext()) {
-                        String fieldName = fieldNames.next();
-                        if (fieldName.matches("\\d+")) {
-                            JsonNode dataNode = node.get(fieldName);
-                            Integer nodeFieldNumber = Integer.valueOf(fieldName);
-                            logger.info("dataNodeParent: " + nodeFieldNumber);
-                            logger.info("dataNode: " + dataNode.toString());
-
-                            String idSubscriber = dataNode.path("subscriberid").asText();
-                            String email = dataNode.path("email").asText();
-                            String timestamp = dataNode.path("tstamp").asText();
-                            String timesOpened = dataNode.path("times").asText();
-
-                            logger.info("Subscriber ID: " + idSubscriber + ", Email: " + email +
-                                    ", Timestamp: " + timestamp + ", Times: " + timesOpened);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 

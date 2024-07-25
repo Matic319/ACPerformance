@@ -16,6 +16,15 @@ import java.util.Optional;
 @Repository
 public interface CampaignRepository extends JpaRepository<Campaign,Integer> {
 
+    Optional<Campaign> findByIdCampaign(Integer idCampaign);
+
+    @Query(value = "select isnull(ignoreMultipleEmails,0) from AC_ref_campaigns where idCampaign = :idCampaign", nativeQuery = true)
+    Integer ignoreListValue(@Param("idCampaign") Integer idCampaign);
+
+    @Query(value = "select isnull(import_to_fact_emails,1) from AC_ref_campaigns where idCampaign = :idCampaign", nativeQuery = true)
+    Integer importToFactValue(@Param("idCampaign") Integer idCampaign);
+
+
     @Query(value = "select idCampaign  from AC_ref_campaigns \n" +
             "where cast(last_send_date as date) >= dateadd(day,-7,cast(GETDATE()as date)) " +
             "and isnull(import_to_fact_emails,1) = 1 ", nativeQuery = true)

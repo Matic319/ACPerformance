@@ -2,6 +2,7 @@ package com.maticz.ACPerformance.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.maticz.ACPerformance.model.Campaign;
+import com.maticz.ACPerformance.model.Emails;
 import com.maticz.ACPerformance.service.ACServiceNew;
 import com.maticz.ACPerformance.service.impl.ACServiceImpl;
 import com.maticz.ACPerformance.service.impl.EmailWarningImpl;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -57,7 +59,7 @@ public class ACController {
 
 
     @GetMapping("/newSave")
-    @Scheduled(cron = "0 0 */2 * * *")
+   // @Scheduled(cron = "0 0 */2 * * *")
     ResponseEntity<String> saveOpenAndUnopen() throws JsonProcessingException {
         acService.saveContactDataForOpenedAndUnopenedEmails2();
         return ResponseEntity.ok("dela");
@@ -92,16 +94,17 @@ public class ACController {
         return ResponseEntity.ok("ok");
     }
 
-    @GetMapping("test")
-    ResponseEntity<String> abv() throws JsonProcessingException {
-        acService.izbrisPol();
+
+    @Scheduled(cron = "0 0 */2 * * *")
+    @GetMapping("saveAll")
+    ResponseEntity<String> saveOpenedAndUnopend() throws JsonProcessingException {
+        acServiceNew.getDataFromACAndSaveToDB();
         return ResponseEntity.ok("ok");
     }
 
-
-    @GetMapping("test2")
-    ResponseEntity<String> abv2() throws JsonProcessingException {
-        acServiceNew.getDataFromACAndSaveToDB();
-        return ResponseEntity.ok("ok");
+    @GetMapping("unsent")
+    ResponseEntity<LocalDateTime> t() throws JsonProcessingException {
+        LocalDateTime a = acServiceNew.getTimestampForContactThatIsNotInMap("5649",100);
+        return ResponseEntity.ok(a);
     }
 }

@@ -50,8 +50,8 @@ public class ACServiceNewImpl implements ACServiceNew {
 
             Integer page = emailsRepository.getPageNumberForCampaignByIdTimesOpenedEquals0(idCampaign);
             for(Integer i = page ; i < 1000 ; i++) {
-                JsonNode unOpenedData = acServiceImpl.getDataForContactsThatHaveNotOpenedEmail(String.valueOf(idCampaign), idMessage, String.valueOf(page));
-                logger.info("Processing JsonNode for campaign {} page {}: {}", idCampaign, i, unOpenedData);
+                JsonNode unOpenedData = acServiceImpl.getDataForContactsThatHaveNotOpenedEmail(String.valueOf(idCampaign), idMessage, String.valueOf(i));
+                logger.info("JsonNode for campaign {} page {}: {}", idCampaign, i, unOpenedData);
 
                 if(unOpenedData.path("result_code").asInt() == 1) {
                     for (JsonNode data : unOpenedData) {
@@ -59,19 +59,28 @@ public class ACServiceNewImpl implements ACServiceNew {
                         String email = data.path("email").asText();
                         Integer timesOpened = data.path("times").asInt();
                         Emails emails = setEmailsEntityWithoutOpenedTimestamp(idCampaign, email, idSubscriber, timesOpened, idMessage, i);
+                        if(idSubscriber != 0) {
+                            if (idCampaignAndTimestamp.get(idCampaign) != null) {
+                                emails.setEmailSent(idCampaignAndTimestamp.get(idCampaign));
+                                logger.info("find idSubscriber {} , idCampaign {} , page {}", idSubscriber, idCampaign, i);
+                                if (emailsRepository.findByIdSubscriberAndIdCampaignAndPageAndImportTimestamp(idSubscriber, idCampaign, i).isEmpty()) {
+                                    if (idSubscriber != 0) {
+                                        emailsRepository.save(emails);
+                                    }
 
-                        if (idCampaignAndTimestamp.containsKey(idCampaign)) {
-                            emails.setOpened(idCampaignAndTimestamp.get(idCampaign));
-                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndPage(idSubscriber, idCampaign, i).isEmpty()) {
-                                emailsRepository.save(emails);
-                            }
-                        } else {
-                            emails.setOpened(getTimestampForContactThatIsNotInMap(String.valueOf(idSubscriber), idCampaign));
-                            if (emailsRepository.findByIdSubscriberAndIdCampaignAndPage(idSubscriber, idCampaign, i).isEmpty()) {
-                                emailsRepository.save(emails);
+                                }
+                            } else {
+                                logger.info("find idSubscriber {} , idCampaign {} , page {}", idSubscriber, idCampaign, i);
+
+                                if (emailsRepository.findByIdSubscriberAndIdCampaignAndPageAndImportTimestamp(idSubscriber, idCampaign, i).isEmpty()) {
+                                    emails.setEmailSent(getTimestampForContactThatIsNotInMap(String.valueOf(idSubscriber), idCampaign));
+                                    if (idSubscriber != 0) {
+                                        emailsRepository.save(emails);
+                                    }
+
+                                }
                             }
                         }
-
                     }
                 }else {
                     break;
@@ -82,49 +91,55 @@ public class ACServiceNewImpl implements ACServiceNew {
     }
 
     @Override
-    public LocalDateTime getTimestampForContactThatIsNotInMap(String idSubscriber,  Integer idCampaign) throws JsonProcessingException {
+    public LocalDateTime getTimestampForContactThatIsNotInMap(String idSubscriber, Integer idCampaign) throws JsonProcessingException {
         String dateFrom = emailsRepository.dateToSearchByForUnopenedClients(idCampaign);
-        Boolean timestampFound = false;
-        Boolean nodeResultEmpty = false;
+        logger.info("Searching for campaign ID: {}, subscriber ID: {}, initial dateFrom: {}", idCampaign, idSubscriber, dateFrom);
+
         LocalDateTime emailSentTimestamp = null;
-        LocalDateTime timestamp = LocalDateTime.now().minusDays(10);
-        Boolean sameTimestamp = false;
+        LocalDateTime lastProcessedTimestamp = null;
 
-            while(!timestampFound && !nodeResultEmpty && timestamp.isBefore(LocalDateTime.now()) && !sameTimestamp){
-                JsonNode node = acServiceImpl.getContactActivitiesAfterDate(idSubscriber,dateFrom);
+        while (LocalDate.parse(dateFrom).isBefore(LocalDate.now())) {
+            JsonNode node = acServiceImpl.getContactActivitiesAfterDate(idSubscriber, dateFrom);
 
-                    for(JsonNode data : node){
-                        if(node.path("meta").path("total").asInt() > 0) {
-                                if(!data.path("logs").isEmpty()){
-                                    for(JsonNode logs : data.path("logs")){
-                                        Integer logsIdCampaign = logs.path("campaignid").asInt();
-                                        OffsetDateTime originalTimestamp = OffsetDateTime.parse(logs.path("tstamp").asText(), formatterISOOffset);
-                                            if(timestamp == originalTimestamp.atZoneSameInstant(ZoneId.of("Europe/Ljubljana")).toLocalDateTime() ){
-                                                sameTimestamp = true;
-                                                dateFrom = String.valueOf(LocalDate.from(timestamp).plusDays(5));
-                                                break;
-                                            }else {
-                                                timestamp = originalTimestamp.atZoneSameInstant(ZoneId.of("Europe/Ljubljana")).toLocalDateTime();
-                                                dateFrom = String.valueOf(LocalDate.from(timestamp));
-                                            }
+            if (node.has("logs")) {
+                JsonNode logs = node.path("logs");
+                for (JsonNode log : logs) {
+                    Integer logsIdCampaign = log.path("campaignid").asInt();
+                    String tstamp = log.path("tstamp").asText();
+                    logger.info(" Logs Campaign ID: {}, Timestamp: {}", logsIdCampaign, tstamp);
 
-                                        if(logsIdCampaign == idCampaign ){
-                                            emailSentTimestamp = timestamp;
-                                            timestampFound = true;
-                                        }
-                                    }
-                                }else {
-                                    timestamp = timestamp.plusDays(5);
-                                }
+                    OffsetDateTime originalTimestamp = OffsetDateTime.parse(tstamp, formatterISOOffset);
+                    LocalDateTime convertedTimestamp = originalTimestamp.atZoneSameInstant(ZoneId.of("Europe/Ljubljana")).toLocalDateTime();
 
-                        }else {
-                            nodeResultEmpty = true;
-                            break;
+                    if (lastProcessedTimestamp == null || convertedTimestamp.isAfter(lastProcessedTimestamp)) {
+                        lastProcessedTimestamp = convertedTimestamp;
+                        dateFrom = convertedTimestamp.toLocalDate().toString();
+                        logger.info("Updated dateFrom: {}", dateFrom);
+
+                        if (logsIdCampaign.equals(idCampaign)) {
+                            emailSentTimestamp = convertedTimestamp;
+                            logger.info("campaign ID found mail sent timestamp: {}", emailSentTimestamp);
+                            return emailSentTimestamp;
                         }
+                    } else {
+                        dateFrom = LocalDate.parse(dateFrom).plusDays(1).toString();
                     }
+                }
+            } else {
+                logger.info("No logs found for date: {}", dateFrom);
+                dateFrom = LocalDate.parse(dateFrom).plusDays(1).toString();
             }
+
+            if (node.path("meta").path("total").asInt() == 0) {
+                logger.info("No more entries found after date: {}", dateFrom);
+                break;
+            }
+        }
+
         return emailSentTimestamp;
     }
+
+
 
     private static Emails setEmailsEntityWithoutOpenedTimestamp(Integer idCampaign, String email, Integer idSubscriber, Integer timesOpened, String idMessage, Integer i) {
         Emails emails = new Emails();
