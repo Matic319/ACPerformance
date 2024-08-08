@@ -12,7 +12,6 @@ import java.util.List;
 @Service
 public interface ACService{
 
-    String getACData() throws JsonProcessingException;
 
     JsonNode getCampaignID(String id, String pageNumber) throws JsonProcessingException;
 
@@ -28,11 +27,9 @@ public interface ACService{
 
     Integer getIdMessageForCampaignInDB(String id) throws JsonProcessingException;
 
-    JsonNode getDataForContactsThatHaveNotOpenedEmail(String idCampaign, String idMessage, String pageNumber) throws JsonProcessingException;
 
     HashMap<Integer, Integer> saveContactsThatHaventOpenedEmail() throws JsonProcessingException;
 
-    JsonNode getContactActivities(String idSubscriber) throws JsonProcessingException;
 
     JsonNode getContactActivitiesAfterDate(String idSubscriber, String date) throws JsonProcessingException;
 
@@ -44,11 +41,6 @@ public interface ACService{
     HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap() throws JsonProcessingException;
 
     HashMap<Integer, LocalDateTime> getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2() throws JsonProcessingException;
-
-    void saveContactsWhereDataIsMissingForPhotos() throws JsonProcessingException;
-
-
-
 
 
 }

@@ -7,16 +7,22 @@ import com.maticz.ACPerformance.repository.CampaignRepository;
 import com.maticz.ACPerformance.repository.EmailsRepository;
 import com.maticz.ACPerformance.repository.EmailsRepositoryNew;
 import com.maticz.ACPerformance.service.ACServiceNew;
+import com.opencsv.CSVReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -35,6 +41,8 @@ public class ACServiceNewImpl implements ACServiceNew {
     @Autowired
     CampaignRepository campaignRepository;
 
+    @Autowired
+            AcApiServiceImpl acApiService;
 
     DateTimeFormatter formatterISOOffset = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
@@ -43,23 +51,23 @@ public class ACServiceNewImpl implements ACServiceNew {
     @Override
     public void getDataFromACAndSaveToDB() throws JsonProcessingException {
 
-        HashMap<Integer, LocalDateTime> idCampaignAndTimestamp =  acServiceImpl.getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2();
+        HashMap<Integer, LocalDateTime> idCampaignAndTimestamp = acServiceImpl.getDataForClientsThatOpenedCampaignsAndAddTimestampToMap2();
         List<Integer> campaignList = campaignRepository.listOfCampaignsSentInLastWeekWithoutSome();
         for (Integer idCampaign : campaignList) {
             String idMessage = String.valueOf(campaignRepository.getIdMessageForCampaign(idCampaign));
 
             Integer page = emailsRepository.getPageNumberForCampaignByIdTimesOpenedEquals0(idCampaign);
-            for(Integer i = page ; i < 1000 ; i++) {
-                JsonNode unOpenedData = acServiceImpl.getDataForContactsThatHaveNotOpenedEmail(String.valueOf(idCampaign), idMessage, String.valueOf(i));
+            for (Integer i = page; i < 1000; i++) {
+                JsonNode unOpenedData = acApiService.getDataForContactsThatHaveNotOpenedEmail(String.valueOf(idCampaign), idMessage, String.valueOf(i));
                 logger.info("JsonNode for campaign {} page {}: {}", idCampaign, i, unOpenedData);
 
-                if(unOpenedData.path("result_code").asInt() == 1) {
+                if (unOpenedData.path("result_code").asInt() == 1) {
                     for (JsonNode data : unOpenedData) {
                         Integer idSubscriber = data.path("subscriberid").asInt();
                         String email = data.path("email").asText();
                         Integer timesOpened = data.path("times").asInt();
                         Emails emails = setEmailsEntityWithoutOpenedTimestamp(idCampaign, email, idSubscriber, timesOpened, idMessage, i);
-                        if(idSubscriber != 0) {
+                        if (idSubscriber != 0) {
                             if (idCampaignAndTimestamp.get(idCampaign) != null) {
                                 emails.setEmailSent(idCampaignAndTimestamp.get(idCampaign));
                                 logger.info("find idSubscriber {} , idCampaign {} , page {}", idSubscriber, idCampaign, i);
@@ -82,7 +90,7 @@ public class ACServiceNewImpl implements ACServiceNew {
                             }
                         }
                     }
-                }else {
+                } else {
                     break;
                 }
 
@@ -140,18 +148,44 @@ public class ACServiceNewImpl implements ACServiceNew {
     }
 
 
-
     private static Emails setEmailsEntityWithoutOpenedTimestamp(Integer idCampaign, String email, Integer idSubscriber, Integer timesOpened, String idMessage, Integer i) {
         Emails emails = new Emails();
-            emails.setEmail(email);
-            emails.setIdSubscriber(idSubscriber);
-            emails.setTimesOpened(timesOpened);
-            emails.setImportTimestamp(LocalDateTime.now());
-            emails.setIdCampaign(idCampaign);
-            emails.setIdMessage(Integer.valueOf(idMessage));
-            emails.setPage(i);
+        emails.setEmail(email);
+        emails.setIdSubscriber(idSubscriber);
+        emails.setTimesOpened(timesOpened);
+        emails.setImportTimestamp(LocalDateTime.now());
+        emails.setIdCampaign(idCampaign);
+        emails.setIdMessage(Integer.valueOf(idMessage));
+        emails.setPage(i);
         return emails;
     }
 
 
+
+    public List<String[]> readAllLines(Path filePath) throws Exception {
+        try (Reader reader = Files.newBufferedReader(filePath)) {
+            try (CSVReader csvReader = new CSVReader(reader)) {
+                return csvReader.readAll();
+            }
+        }
+    }
+
+    public List<String[]> readAllLinesExample() throws Exception {
+        Path path = Paths.get(
+                ClassLoader.getSystemResource("C:\\Users\\Matic\\Desktop\\listUnsub.csv").toURI());
+        return readAllLines(path);
+    }
+
+    public List<String[]> readLineByLine(Path filePath) throws Exception {
+        List<String[]> list = new ArrayList<>();
+        try (Reader reader = Files.newBufferedReader(filePath)) {
+            try (CSVReader csvReader = new CSVReader(reader)) {
+                String[] line;
+                while ((line = csvReader.readNext()) != null) {
+                    list.add(line);
+                }
+            }
+        }
+        return list;
+    }
 }

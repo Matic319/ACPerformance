@@ -8,6 +8,7 @@ import com.maticz.ACPerformance.model.Campaign;
 import com.maticz.ACPerformance.model.Emails;
 import com.maticz.ACPerformance.repository.CampaignRepository;
 import com.maticz.ACPerformance.repository.EmailsRepository;
+import com.maticz.ACPerformance.repository.UnsubscriptionsRepository;
 import com.maticz.ACPerformance.service.ACService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,12 @@ public class ACServiceImpl implements ACService {
     @Autowired
     EmailsRepository emailsRepository;
 
+    @Autowired
+    UnsubscriptionsRepository unsubscriptionsRepository;
+
+    @Autowired
+            AcApiServiceImpl acApiService;
+
 
     Logger logger = LoggerFactory.getLogger(ACService.class);
     @Value("${api.token}")
@@ -55,25 +62,6 @@ public class ACServiceImpl implements ACService {
 
 
 
-
-    @Override
-    public String getACData() throws JsonProcessingException {
-        RestTemplate restTemplate = new RestTemplate();
-        String baseUrl = "https://woop.activehosted.com/api/3/campaigns/?campaignID=";
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Api-Token", apiToken);
-
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> response = restTemplate.exchange(baseUrl, HttpMethod.GET, entity, String.class);
-        String result = response.getBody();
-
-
-        logger.info(result);
-        return result;
-    }
 
 
     @Override
@@ -176,6 +164,7 @@ public class ACServiceImpl implements ACService {
         cmpg.setIdMessage(idMessage);
         cmpg.setLastSendDate(lastSendDate);
         cmpg.setSubscriberClicks(subscriberClicks);
+        cmpg.setReportRelated(1);
         if (!automationName.isEmpty()) {
             cmpg.setAutomation(automationName);
         } else {
@@ -306,6 +295,9 @@ public class ACServiceImpl implements ACService {
                     } else {
                         cmpg.setIgnoreMultipleEmails(campaignRepository.ignoreListValue(cmpg.getIdCampaign()));
                         cmpg.setImportToFactEmails(campaignRepository.importToFactValue(cmpg.getIdCampaign()));
+                        cmpg.setReportRelated(campaignRepository.reportRelatedValue(cmpg.getIdCampaign()));
+                        cmpg.setAttractionRelated(campaignRepository.attractionRelatedValue(cmpg.getIdCampaign()));
+                        campaignRepository.save(cmpg);
                     }
                     savedData.add(cmpg);
 
@@ -342,18 +334,7 @@ public class ACServiceImpl implements ACService {
     }
 
 
-    @Override
-    public JsonNode getDataForContactsThatHaveNotOpenedEmail(String idCampaign, String idMessage, String pageNumber) throws JsonProcessingException {
-        RestTemplate restTemplate = new RestTemplate();
-        String baseUrl = "https://woop.api-us1.com/admin/api.php?api_action=campaign_report_unopen_list&api_output=json&campaignid=" + idCampaign + "&messageid=" + idMessage + "&page=" + pageNumber;
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Api-Token", apiToken);
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<String> response = restTemplate.exchange(baseUrl, HttpMethod.GET, entity, String.class);
-        ObjectMapper objectMapper = new ObjectMapper();
 
-        return objectMapper.readTree(response.getBody());
-    }
 
     @Override
     public HashMap<Integer, Integer> saveContactsThatHaventOpenedEmail() throws JsonProcessingException {
@@ -365,7 +346,7 @@ public class ACServiceImpl implements ACService {
         for (Object row[] : idsLast7Days) {
             Integer pageNum = emailsRepository.getPageNumberForCampaignByIdTimesOpenedEquals0(Integer.parseInt(row[0].toString()));
             for (int i = pageNum; i < 1000; i++) {
-                JsonNode node = getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(i));
+                JsonNode node = acApiService.getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(i));
 
                 if (Objects.equals(node.path("result_code").asText(), "0")) {
                     break;
@@ -406,45 +387,7 @@ public class ACServiceImpl implements ACService {
         return hashMapOfIdSubscribersAdded;
     }
 
-    @Override
-    public JsonNode getContactActivities(String idSubscriber) throws JsonProcessingException {
 
-        final int MAX_RETRIES = 3;
-        final long RETRY_DELAY = TimeUnit.SECONDS.toMillis(1);
-
-        int retryCount = 0;
-        boolean success = false;
-
-        ResponseEntity<String> response = null;
-        ObjectMapper objectMapper = null;
-        while (!success && retryCount < MAX_RETRIES) {
-            try {
-                RestTemplate restTemplate = new RestTemplate();
-                String baseUrl = "https://woop.api-us1.com/api/3/activities?contact=" + idSubscriber + "&orders[tstamp]=desc&limit=1000&api_output=json";
-                HttpHeaders headers = new HttpHeaders();
-                headers.set("Api-Token", apiToken);
-                HttpEntity<String> entity = new HttpEntity<>(headers);
-                response = restTemplate.exchange(baseUrl, HttpMethod.GET, entity, String.class);
-                success = true;
-                objectMapper = new ObjectMapper();
-
-            } catch (HttpServerErrorException e) {
-                System.err.println(" failed: " + e.getMessage());
-
-                retryCount++;
-
-                if (retryCount < MAX_RETRIES) {
-                    try {
-                        Thread.sleep(RETRY_DELAY);
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
-            }
-        }
-
-        return objectMapper.readTree(response.getBody());
-    }
 
     @Override
     public JsonNode getContactActivitiesAfterDate(String idSubscriber, String date) throws JsonProcessingException {
@@ -548,7 +491,7 @@ public class ACServiceImpl implements ACService {
                 for (int i = pageNum; i < 1000; i++) {
                     JsonNode node = null;
                     try {
-                        node = getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(i));
+                        node = acApiService.getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(i));
                     } catch (JsonProcessingException e) {
                         throw new RuntimeException(e);
                     }
@@ -589,7 +532,7 @@ public class ACServiceImpl implements ACService {
                 Integer pageNum = emailsRepository.getPageNumberForCampaignByIdTimesOpenedEquals0(Integer.parseInt(row[0].toString()));
                 for (Integer j = pageNum; j < 100; j++) {
                     try {
-                        JsonNode node = getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(j));
+                        JsonNode node = acApiService.getDataForContactsThatHaveNotOpenedEmail(row[0].toString(), row[1].toString(), String.valueOf(j));
                         Boolean skip = false;
                         if (!Objects.equals(node.path("result_code").asText(), "0")) {
                             Integer idSubscriber = null;
@@ -619,7 +562,7 @@ public class ACServiceImpl implements ACService {
                                 } else {
                                     JsonNode contactActivityNode = null;
                                     try {
-                                        contactActivityNode = getContactActivities(String.valueOf(idSubscriber));
+                                        contactActivityNode = acApiService.getContactActivities(String.valueOf(idSubscriber));
                                     } catch (JsonProcessingException e) {
                                         throw new RuntimeException(e);
                                     }
@@ -794,52 +737,6 @@ public class ACServiceImpl implements ACService {
         return mapIdCampaignTimestamp;
     }
 
-    @Override
-    public void saveContactsWhereDataIsMissingForPhotos() throws JsonProcessingException {
-        List<Object[]> minPageNumbAndCampaign = emailsRepository.getMinPageWhereCountLessThen20ForBdayPhotos();
-
-        minPageNumbAndCampaign.forEach(row -> {
-            String pageNumb = row[0].toString();
-            String idCampaign = row[1].toString();
-
-
-            JsonNode node = null;
-            try {
-                node = getClientsByCampaign(idCampaign, pageNumb);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-
-            if (Objects.equals(node.path("result_code").asText(), "0")) {
-
-            } else {
-                for (JsonNode data : node) {
-                    try {
-                        logger.info(node.asText());
-                        Integer idSubscriber = Integer.valueOf(data.path("subscriberid").asText());
-                        String email = data.path("email").asText();
-                        Integer times = Integer.valueOf(data.path("times").asText());
-
-                        Emails emails = new Emails();
-                        emails.setEmail(email);
-                        emails.setIdSubscriber(idSubscriber);
-                        emails.setIdCampaign(Integer.valueOf(idCampaign));
-                        emails.setTimesOpened(times);
-                        emails.setPage(Integer.parseInt(pageNumb));
-                        logger.info(emails.toString());
-
-                        if (emailsRepository.findByIdSubscriberAndIdCampaign(idSubscriber, Integer.parseInt(idCampaign)).isPresent()) {
-
-                        } else {
-                            emailsRepository.save(emails);
-                        }
-                    } catch (NumberFormatException | NullPointerException ignored) {
-                    }
-                }
-            }
-
-        });
-    }
 
 
 }

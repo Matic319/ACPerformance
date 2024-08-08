@@ -24,6 +24,12 @@ public interface CampaignRepository extends JpaRepository<Campaign,Integer> {
     @Query(value = "select isnull(import_to_fact_emails,1) from AC_ref_campaigns where idCampaign = :idCampaign", nativeQuery = true)
     Integer importToFactValue(@Param("idCampaign") Integer idCampaign);
 
+    @Query(value = "select isnull(reportRelated,1) from AC_ref_campaigns where idCampaign = :idCampaign", nativeQuery = true)
+    Integer reportRelatedValue(@Param("idCampaign") Integer idCampaign );
+
+    @Query(value = "select isnull(attractionRelated,0) from AC_ref_campaigns where idCampaign = :idCampaign", nativeQuery = true)
+    Integer attractionRelatedValue(@Param("idCampaign") Integer idCampaign );
+
 
     @Query(value = "select idCampaign  from AC_ref_campaigns \n" +
             "where cast(last_send_date as date) >= dateadd(day,-7,cast(GETDATE()as date)) " +
@@ -109,4 +115,8 @@ public interface CampaignRepository extends JpaRepository<Campaign,Integer> {
             value = "select idMessage from ac_ref_campaigns where idcampaign =  :id"
             ,nativeQuery = true )
     Integer getIdMessageForCampaign(@Param("id") Integer id);
+
+    @Query
+            (value =" select idCampaign from AC_ref_campaigns ", nativeQuery = true)
+    List<Object[]> getAllIdCampaigns();
 }

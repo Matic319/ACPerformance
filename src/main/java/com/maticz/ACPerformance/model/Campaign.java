@@ -83,4 +83,10 @@ public class Campaign {
 
     @Column(name = "ignoreMultipleEmails")
     private Integer ignoreMultipleEmails;
+
+    @Column(name = "AttractionRelated")
+    private Integer attractionRelated;
+
+    @Column(name = "ReportRelated")
+    private Integer reportRelated;
 }

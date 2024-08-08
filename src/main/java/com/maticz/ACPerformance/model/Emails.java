@@ -41,4 +41,7 @@ public class Emails {
 
     @Column(name = "importTimestamp")
     private LocalDateTime importTimestamp;
+
+    @Column(name = "unsubscribed")
+    private Integer unsubscribed;
 }

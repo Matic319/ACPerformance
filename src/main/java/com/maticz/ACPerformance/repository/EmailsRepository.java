@@ -152,15 +152,6 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
     List<Object[]> getAllClientsThatReceivedMultipleEmailsInTheSameDay();
 
 
-    @Query
-            (value = " select 52, 516 from (\n" +
-                    "select count(*) st, page, idCampaign from AC_fact_emails \n" +
-                    "where opened > 0 and idCampaign in (516,522,572,560,1227) \n" +
-                    "group by page, idCampaign \n" +
-                    ") a \n" +
-                    "where st < 20\n" +
-                    "group by idCampaign " , nativeQuery = true)
-    List<Object[]> getMinPageWhereCountLessThen20ForBdayPhotos();
 
     @Query
             (value = " select case when dateFrom is null then (select create_date from AC_ref_campaigns where idcampaign = :idCampaign) else dateFrom end from (\n" +
@@ -168,5 +159,7 @@ public interface EmailsRepository extends JpaRepository<Emails,Integer> {
                     "\twhere times_opened = 0  \n" +
                     "    and a.idCampaign = :idCampaign ) a " , nativeQuery = true)
     String dateToSearchByForUnopenedClients(@Param("idCampaign") Integer idCampaign);
+
+
 
 }
