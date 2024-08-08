@@ -14,4 +14,5 @@ public interface AcApiService {
     JsonNode getDataForContactsThatHaveNotOpenedEmail(String idCampaign, String idMessage, String pageNumber) throws JsonProcessingException;
 
     JsonNode getLinkData(String idCampaign) throws JsonProcessingException;
-}
+
+    JsonNode getMPPLinkData(String idLink) throws JsonProcessingException;}

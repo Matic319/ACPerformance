@@ -35,7 +35,7 @@ public class AcApiServiceImpl implements AcApiService {
         while (!success && retryCount < MAX_RETRIES) {
             try {
                 RestTemplate restTemplate = new RestTemplate();
-                String baseUrl = "https://woop.api-us1.com/admin/api.php?api_action=campaign_report_unsubscription_list&api_output=json&campaignid=" +idCampaign + "&page=" + page + "&api_output=json";
+                String baseUrl = "https://woop.api-us1.com/admin/api.php?api_action=campaign_report_unsubscription_list&api_output=json&campaignid=" + idCampaign + "&page=" + page + "&api_output=json";
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Api-Token", apiToken);
                 HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -129,7 +129,7 @@ public class AcApiServiceImpl implements AcApiService {
         while (!success && retryCount < MAX_RETRIES) {
             try {
                 RestTemplate restTemplate = new RestTemplate();
-                String baseUrl = "https://woop.api-us1.com/api/3/campaigns/" +idCampaign + "/links";
+                String baseUrl = "https://woop.api-us1.com/api/3/campaigns/" + idCampaign + "/links";
                 HttpHeaders headers = new HttpHeaders();
                 headers.set("Api-Token", apiToken);
                 HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -155,4 +155,41 @@ public class AcApiServiceImpl implements AcApiService {
         return objectMapper.readTree(response.getBody());
     }
 
+    @Override
+    public JsonNode getMPPLinkData(String idLink) throws JsonProcessingException {
+        final int MAX_RETRIES = 3;
+        final long RETRY_DELAY = TimeUnit.SECONDS.toMillis(1);
+
+        int retryCount = 0;
+        boolean success = false;
+
+        ResponseEntity<String> response = null;
+        ObjectMapper objectMapper = null;
+        while (!success && retryCount < MAX_RETRIES) {
+            try {
+                RestTemplate restTemplate = new RestTemplate();
+                String baseUrl = "https://woop.api-us1.com/api/3/links/" + idLink + "/mppLinkData";
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("Api-Token", apiToken);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+                response = restTemplate.exchange(baseUrl, HttpMethod.GET, entity, String.class);
+                success = true;
+                objectMapper = new ObjectMapper();
+
+            } catch (HttpServerErrorException e) {
+                System.err.println(" failed: " + e.getMessage());
+
+                retryCount++;
+
+                if (retryCount < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        }
+        return objectMapper.readTree(response.getBody());
+    }
 }

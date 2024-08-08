@@ -2,11 +2,9 @@ package com.maticz.ACPerformance.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.maticz.ACPerformance.model.Campaign;
+import com.maticz.ACPerformance.repository.CampaignRepository;
 import com.maticz.ACPerformance.service.ACServiceNew;
-import com.maticz.ACPerformance.service.impl.ACServiceImpl;
-import com.maticz.ACPerformance.service.impl.ACServiceNewImpl;
-import com.maticz.ACPerformance.service.impl.EmailWarningImpl;
-import com.maticz.ACPerformance.service.impl.UnsubscriptionsServiceImpl;
+import com.maticz.ACPerformance.service.impl.*;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +32,11 @@ public class ACController {
     @Autowired
     UnsubscriptionsServiceImpl unsubscriptionsService;
 
+    @Autowired
+    CampaignRepository campaignRepository;
+
+    @Autowired
+    LinksServiceImpl linksService;
 
     @GetMapping("/saveUnopened")
     ResponseEntity<String> saveUnopenedClients() throws JsonProcessingException {
@@ -128,5 +131,15 @@ public class ACController {
             System.out.println("idsub: " + line[0] + " date: " + line[1]);
         }
         return ResponseEntity.ok(a);
+    }
+
+    @GetMapping("getLink")
+    ResponseEntity<String> getLinks() throws JsonProcessingException {
+     List<Object[]> list = campaignRepository.getAllIdCampaignsAndIdMessage();
+
+     for(Object[] a : list ){
+         linksService.saveLinkIdToDB(a[0].toString(), a[1].toString());
+     }
+     return ResponseEntity.ok("ok");
     }
 }

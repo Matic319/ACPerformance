@@ -6,9 +6,11 @@ import com.maticz.ACPerformance.model.Links;
 import com.maticz.ACPerformance.repository.LinksRepository;
 import com.maticz.ACPerformance.service.LinksService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
+@Service
 public class LinksServiceImpl implements LinksService {
 
     @Autowired
@@ -21,24 +23,33 @@ public class LinksServiceImpl implements LinksService {
     @Override
     public void saveLinkIdToDB(String idCampaign, String idMessage) throws JsonProcessingException {
         //lahko je več "open" za različne idMessage
-        JsonNode node = acApiService.getLinkData(idCampaign);
-        for(JsonNode data : node.path("links")){
-            Integer campaignId = data.path("campaignid").asInt();
-            Integer messageId = data.path("messageid").asInt();
-            String link = data.path("link").asText();
-            Integer linkId = data.path("id").asInt();
+        try {
+            JsonNode node = acApiService.getLinkData(idCampaign);
+            if (node.has("links")) {
+                for (JsonNode data : node.path("links")) {
+                    Integer campaignId = data.path("campaignid").asInt();
+                    Integer messageId = data.path("messageid").asInt();
+                    String link = data.path("link").asText();
+                    Integer linkId = data.path("id").asInt();
 
-            if(Objects.equals(String.valueOf(campaignId), idCampaign) &&
-                    Objects.equals(String.valueOf(messageId), idMessage) &&
-                    Objects.equals(link, "open")
-            ){
-                Links linkEntity = new Links();
-                linkEntity.setLink(link);
-                linkEntity.setIdCampaign(campaignId);
-                linkEntity.setIdMessage(messageId);
-                linkEntity.setIdLink(linkId);
-                linksRepository.save(linkEntity);
+                    if (Objects.equals(String.valueOf(campaignId), idCampaign) &&
+                            Objects.equals(String.valueOf(messageId), idMessage) &&
+                            Objects.equals(link, "open")
+                    ) {
+                        Links linkEntity = new Links();
+                        linkEntity.setLink(link);
+                        linkEntity.setIdCampaign(campaignId);
+                        linkEntity.setIdMessage(messageId);
+                        linkEntity.setIdLink(linkId);
+                        linksRepository.save(linkEntity);
+                    }
+                }
             }
+
+        }catch ( Exception ignored){
+            //če kampanja nima linkov / podatkov
         }
     }
+
+
 }

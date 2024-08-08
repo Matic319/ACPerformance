@@ -117,6 +117,6 @@ public interface CampaignRepository extends JpaRepository<Campaign,Integer> {
     Integer getIdMessageForCampaign(@Param("id") Integer id);
 
     @Query
-            (value =" select idCampaign from AC_ref_campaigns ", nativeQuery = true)
-    List<Object[]> getAllIdCampaigns();
+            (value =" select idCampaign, idMessage from AC_ref_campaigns ", nativeQuery = true)
+    List<Object[]> getAllIdCampaignsAndIdMessage();
 }
